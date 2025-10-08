@@ -23,6 +23,8 @@ const api = {
     electron.ipcRenderer.on(channel, listener);
     return () => electron.ipcRenderer.removeListener(channel, listener);
   },
-  disconnectSession: (sessionId) => electron.ipcRenderer.invoke("ssh-disconnect", sessionId)
+  disconnectSession: (sessionId) => electron.ipcRenderer.invoke("ssh-disconnect", sessionId),
+  exportConnections: () => electron.ipcRenderer.invoke("export-connections"),
+  importConnections: () => electron.ipcRenderer.invoke("import-connections")
 };
 electron.contextBridge.exposeInMainWorld("electronAPI", api);

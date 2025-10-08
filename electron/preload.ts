@@ -31,6 +31,8 @@ type ElectronAPI = {
   sendSessionInput: (sessionId: string, data: string) => void;
   onSessionData: (sessionId: string, callback: (data: string) => void) => () => void;
   disconnectSession: (sessionId: string) => Promise<void>;
+  exportConnections: () => Promise<boolean>;
+  importConnections: () => Promise<boolean>;
 };
 
 const api: ElectronAPI = {
@@ -57,6 +59,8 @@ const api: ElectronAPI = {
     return () => ipcRenderer.removeListener(channel, listener);
   },
   disconnectSession: (sessionId) => ipcRenderer.invoke('ssh-disconnect', sessionId),
+  exportConnections: () => ipcRenderer.invoke('export-connections'),
+  importConnections: () => ipcRenderer.invoke('import-connections'),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', api);

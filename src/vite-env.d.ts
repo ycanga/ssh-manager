@@ -3,6 +3,8 @@
 type Connection = { id: string; name: string; host: string; port?: number; username: string };
 
 interface ElectronAPI {
+  importConnections(): unknown;
+  exportConnections(): unknown;
   sshConnect: (config: { host: string; port?: number; username: string; password?: string }) => Promise<unknown>;
   saveSecret: (id: string, password: string) => Promise<boolean>;
   getSecret: (id: string) => Promise<string | null>;

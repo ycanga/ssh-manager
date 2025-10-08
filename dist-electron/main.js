@@ -1,4 +1,4 @@
-import { app, ipcMain, BrowserWindow } from "electron";
+import { app, ipcMain, dialog, BrowserWindow } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
 import { Client } from "ssh2";
@@ -151,4 +151,31 @@ ipcMain.handle("delete-connection", (_e, id) => {
   const all = fs.existsSync(storePath) ? JSON.parse(fs.readFileSync(storePath, "utf8")) : [];
   const filtered = all.filter((c) => c.id !== id);
   fs.writeFileSync(storePath, JSON.stringify(filtered, null, 2));
+});
+ipcMain.handle("export-connections", async () => {
+  if (!fs.existsSync(storePath)) return false;
+  const data = fs.readFileSync(storePath, "utf8");
+  const { filePath } = await dialog.showSaveDialog(win, {
+    title: "Bağlantıları Export Et",
+    defaultPath: "connections.json",
+    filters: [{ name: "JSON", extensions: ["json"] }]
+  });
+  if (filePath) {
+    fs.writeFileSync(filePath, data);
+    return true;
+  }
+  return false;
+});
+ipcMain.handle("import-connections", async () => {
+  const { filePaths } = await dialog.showOpenDialog(win, {
+    title: "Bağlantıları Import Et",
+    properties: ["openFile"],
+    filters: [{ name: "JSON", extensions: ["json"] }]
+  });
+  if (!filePaths || filePaths.length === 0) return false;
+  const imported = JSON.parse(fs.readFileSync(filePaths[0], "utf8"));
+  const existing = fs.existsSync(storePath) ? JSON.parse(fs.readFileSync(storePath, "utf8")) : [];
+  const merged = [...existing, ...imported.filter((c) => !existing.some((e) => e.id === c.id))];
+  fs.writeFileSync(storePath, JSON.stringify(merged, null, 2));
+  return true;
 });

@@ -1,7 +1,7 @@
-// src/App.tsx
 import { useEffect, useState } from 'react';
 import TerminalView from './components/TerminalView';
 import './index.css';
+import { FiUpload, FiDownload, FiSun, FiPlus } from 'react-icons/fi'
 
 function App() {
   type Connection = { id: string; name: string; host: string; port?: number; username: string; password?: string };
@@ -23,12 +23,17 @@ function App() {
       const list = await window.electronAPI!.getConnections();
       setConnections(list || []);
     })();
+
+    const root = document.documentElement;
+    if (!root.classList.contains('theme-light') && !root.classList.contains('theme-dark')) {
+      root.classList.add('theme-light');
+    }
   }, []);
 
   const connectSSH = async (conn: { host: string; port?: number; username: string; password?: string }) => {
     setIsConnecting(true);
     try {
-      const sessionId = `${conn.username}@${conn.host}:${conn.port||22}-${Date.now()}`;
+      const sessionId = `${conn.username}@${conn.host}:${conn.port || 22}-${Date.now()}`;
       await window.electronAPI.openSession(sessionId, conn);
       const tab = { id: sessionId, title: `${conn.username}@${conn.host}`, conn: { id: sessionId, name: sessionId, host: conn.host, port: conn.port, username: conn.username, password: conn.password } };
       setTabs((t) => [...t, tab]);
@@ -57,20 +62,60 @@ function App() {
   return (
     <div className="app">
       <div className="sidebar">
-        <div className="header">
-          <h1>SSH Manager</h1>
-          <div className="row">
-            <button className="btn" onClick={() => {
-              const root = document.documentElement;
-              if (root.classList.contains('theme-dark')) {
-                root.classList.remove('theme-dark');
-                root.classList.add('theme-light');
-              } else {
-                root.classList.remove('theme-light');
-                root.classList.add('theme-dark');
-              }
-            }}>Tema</button>
-          <button className="btn" onClick={() => { setEditing(null); setName(''); setHost(''); setPort(22); setUsername(''); setPassword(''); setShowAdd(true); }}>Ekle</button>
+        <div className="header" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <h1 style={{ margin: 0, fontSize: '1.8rem' }}>SSH Manager</h1>
+          <div
+            className="row"
+            style={{
+              display: 'flex',
+              gap: '0.1rem',
+              flexWrap: 'nowrap',
+              overflowX: 'auto',
+              padding: '0.25rem 0',
+            }}
+          >
+            <button className="btn modern" style={{ whiteSpace: 'nowrap', background: '#3b82f6', color: 'white', display: 'flex', alignItems: 'center', gap: '0rem', padding: '0.5rem 0.8rem', borderRadius: '0.35rem', flexShrink: 0 }}
+              onClick={async () => {
+                const ok = await window.electronAPI.exportConnections();
+                if (ok) alert('Bağlantılar export edildi.');
+              }}
+            ><FiUpload size={15} /> Export</button>
+
+            <button className="btn modern" style={{ whiteSpace: 'nowrap', background: '#10b981', color: 'white', display: 'flex', alignItems: 'center', gap: '0rem', padding: '0.5rem 0.8rem', borderRadius: '0.35rem', flexShrink: 0 }}
+              onClick={async () => {
+                const ok = await window.electronAPI.importConnections();
+                if (ok) {
+                  alert('Bağlantılar import edildi.');
+                  const list = await window.electronAPI.getConnections();
+                  setConnections(list || []);
+                }
+              }}
+            ><FiDownload size={15} /> Import</button>
+
+            <button className="btn modern" style={{ whiteSpace: 'nowrap', background: '#facc15', color: '#1f2937', display: 'flex', alignItems: 'center', gap: '0rem', padding: '0.5rem 0.8rem', borderRadius: '0.35rem', flexShrink: 0 }}
+              onClick={() => {
+                const root = document.documentElement;
+                if (!root.classList.contains('theme-dark')) {
+                  root.classList.remove('theme-light');
+                  root.classList.add('theme-dark');
+                } else {
+                  root.classList.remove('theme-dark');
+                  root.classList.add('theme-light');
+                }
+              }}
+            ><FiSun size={15} /> Tema</button>
+
+            <button className="btn modern" style={{ whiteSpace: 'nowrap', background: '#ef4444', color: 'white', display: 'flex', alignItems: 'center', gap: '0rem', padding: '0.5rem 0.8rem', borderRadius: '0.35rem', flexShrink: 0 }}
+              onClick={() => {
+                setEditing(null);
+                setName('');
+                setHost('');
+                setPort(22);
+                setUsername('');
+                setPassword('');
+                setShowAdd(true);
+              }}
+            ><FiPlus size={15} /> Ekle</button>
           </div>
         </div>
 
@@ -98,7 +143,7 @@ function App() {
                     if (!confirm('Bu bağlantıyı silmek istediğinize emin misiniz?')) return;
                     await window.electronAPI.deleteConnection(c.id);
                     const list = await window.electronAPI.getConnections();
-                    setConnections(list||[]);
+                    setConnections(list || []);
                   }}
                 >Sil</button>
               </div>
@@ -112,30 +157,30 @@ function App() {
 
       <div className="content">
         {tabs.length > 0 ? (
-          <div style={{display:'flex', flexDirection:'column', height:'100%'}}>
-            <div style={{display:'flex', gap:'.5rem', borderBottom:'1px solid var(--border)', padding:'.5rem'}}>
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <div style={{ display: 'flex', gap: '.5rem', borderBottom: '1px solid var(--border)', padding: '.5rem' }}>
               {tabs.map(t => (
-                <div key={t.id} className="card" style={{padding:'.35rem .6rem', display:'flex', alignItems:'center', gap:'.5rem', background: activeTabId===t.id? 'var(--panel)':'#0b1220'}}>
+                <div key={t.id} className="card" style={{ padding: '.35rem .6rem', display: 'flex', alignItems: 'center', gap: '.5rem', background: activeTabId === t.id ? 'var(--panel)' : '#0b1220' }}>
                   <button className="btn ghost" onClick={() => setActiveTabId(t.id)}>{t.title}</button>
                   <button className="btn danger" onClick={async () => {
                     await window.electronAPI.disconnectSession(t.id);
-                    setTabs((prev)=>prev.filter(x=>x.id!==t.id));
-                    if (activeTabId===t.id) setActiveTabId(() => {
-                      const rest = tabs.filter(x=>x.id!==t.id);
+                    setTabs((prev) => prev.filter(x => x.id !== t.id));
+                    if (activeTabId === t.id) setActiveTabId(() => {
+                      const rest = tabs.filter(x => x.id !== t.id);
                       return rest[0]?.id ?? null;
                     });
                   }}>×</button>
                 </div>
               ))}
             </div>
-            <div style={{flex:1}}>
-              {tabs.filter(t=>t.id===activeTabId).map(t => (
+            <div style={{ flex: 1 }}>
+              {tabs.filter(t => t.id === activeTabId).map(t => (
                 <TerminalView key={t.id} connection={t.conn} />
               ))}
             </div>
           </div>
         ) : (
-          <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%', color:'#94a3b8'}}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8' }}>
             Bir bağlantı seçin veya ekleyin.
           </div>
         )}
@@ -156,7 +201,7 @@ function App() {
                 </button>
               </div>
             </div>
-            <div className="row" style={{justifyContent:'flex-end'}}>
+            <div className="row" style={{ justifyContent: 'flex-end' }}>
               <button className="btn ghost" onClick={() => setShowAdd(false)}>Vazgeç</button>
               <button className="btn primary" onClick={async () => {
                 if (editing) {
@@ -166,7 +211,7 @@ function App() {
                   }
                   await window.electronAPI.updateConnection(updated);
                   const list = await window.electronAPI.getConnections();
-                  setConnections(list||[]);
+                  setConnections(list || []);
                   setEditing(null);
                   setShowAdd(false);
                   setName(''); setHost(''); setPort(22); setUsername(''); setPassword(''); setShow(false);
