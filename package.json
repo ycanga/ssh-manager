@@ -1,14 +1,20 @@
 {
   "name": "elektron-ssh-management",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
+  "description": "SSH bağlantı yöneticisi ve terminal",
+  "author": "ycanga (https://github.com/ycanga)",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && tsc -p electron",
+    "build": "vite build",
     "start": "electron .",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dist": "npm run build && electron-builder",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux"
   },
   "dependencies": {
     "keytar": "^7.9.0",

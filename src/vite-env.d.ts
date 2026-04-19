@@ -15,10 +15,11 @@ interface ElectronAPI {
   saveConnection: (conn: Connection) => Promise<void>;
   updateConnection: (conn: Connection) => Promise<void>;
   deleteConnection: (id: string) => Promise<void>;
-  openSession: (sessionId: string, cfg: { host: string; port?: number; username?: string; password?: string; privateKey?: string | Buffer; privateKeyPath?: string; passphrase?: string }) => Promise<unknown>;
+  openSession: (sessionId: string, cfg: { host: string; port?: number; username?: string; password?: string; privateKey?: string | Buffer; privateKeyPath?: string; passphrase?: string; cols?: number; rows?: number }) => Promise<unknown>;
   sendSessionInput: (sessionId: string, data: string) => void;
   onSessionData: (sessionId: string, callback: (data: string) => void) => () => void;
   disconnectSession: (sessionId: string) => Promise<void>;
+  resizeSession: (sessionId: string, cols: number, rows: number, heightPx?: number, widthPx?: number) => void;
 }
 
 declare interface Window {

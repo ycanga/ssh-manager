@@ -1,30 +1,28 @@
-# React + TypeScript + Vite
+# SSH Manager
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Electron tabanlı SSH bağlantı yöneticisi ve terminal arayüzü.
 
-Currently, two official plugins are available:
+## Komutlar
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### Geliştirme
 
-## Expanding the ESLint configuration
+| Komut | Açıklama |
+|--------|----------|
+| `npm run dev` | Vite geliştirme sunucusu (HMR) |
+| `npm run start` | Üretim öncesi derleme sonrası Electron’u `electron .` ile çalıştırır |
+| `npm run build` | `dist/` ve `dist-electron/` üretim derlemesi |
+| `npm run lint` | ESLint |
+| `npm run preview` | Vite önizleme sunucusu |
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+### Kurulum paketleri (electron-builder)
 
-- Configure the top-level `parserOptions` property like this:
+Çıktılar `release/` klasörüne yazılır.
 
-```js
-export default {
-  // other rules...
-  parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
-    project: ['./tsconfig.json', './tsconfig.node.json'],
-    tsconfigRootDir: __dirname,
-  },
-}
-```
+| Komut | Açıklama |
+|--------|----------|
+| `npm run dist` | Geçerli işletim sistemi için paket üretir |
+| `npm run dist:mac` | macOS: `.dmg` ve `.zip` |
+| `npm run dist:win` | Windows: NSIS kurulum + portable `.exe` (x64) |
+| `npm run dist:linux` | Linux: AppImage + `.deb` |
 
-- Replace `plugin:@typescript-eslint/recommended` to `plugin:@typescript-eslint/recommended-type-checked` or `plugin:@typescript-eslint/strict-type-checked`
-- Optionally add `plugin:@typescript-eslint/stylistic-type-checked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and add `plugin:react/recommended` & `plugin:react/jsx-runtime` to the `extends` list
+> **Not:** Windows ve Linux paketlerini sorunsuz üretmek için genelde ilgili OS üzerinde veya CI’da çalıştırmak gerekir.

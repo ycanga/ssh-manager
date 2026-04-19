@@ -1,5 +1,5 @@
 // electron/main.ts
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { Client } from 'ssh2';
@@ -15,10 +15,29 @@ interface SshStream {
   on(event: 'data', cb: (data: Buffer) => void): void;
   on(event: 'close', cb: () => void): void;
   write(data: string | Buffer): void;
+  setWindow?(rows: number, cols: number, heightPx?: number, widthPx?: number): void;
 }
 
 let win: BrowserWindow | null = null;
-const sessions = new Map<string, { conn: Client | null }>();
+const sessions = new Map<string, { conn: Client | null; stream: SshStream | null }>();
+
+ipcMain.on(
+  'ssh-session-resize',
+  (_e, payload: { sessionId: string; cols: number; rows: number; heightPx?: number; widthPx?: number }) => {
+    const { sessionId, cols, rows, heightPx = 0, widthPx = 0 } = payload ?? ({} as typeof payload);
+    if (!sessionId || cols < 1 || rows < 1) return;
+    const s = sessions.get(sessionId);
+    const stream = s?.stream;
+    if (stream?.setWindow) {
+      try {
+        // ssh2: setWindow(rows, cols, heightPx, widthPx)
+        stream.setWindow(rows, cols, heightPx, widthPx);
+      } catch {
+        // channel may be closed
+      }
+    }
+  },
+);
 
 async function createWindow() {
   win = new BrowserWindow({
@@ -35,6 +54,13 @@ async function createWindow() {
   } else {
     await win.loadFile(path.join(currentDir, '../dist/index.html'));
   }
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https:') || url.startsWith('http:')) {
+      void shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
 }
 
 app.whenReady().then(createWindow);
@@ -99,14 +125,22 @@ ipcMain.handle('ssh-shell', async (_event, config: { host: string; port?: number
 });
 
 // === Session-scoped SSH (supports multiple tabs) ===
-ipcMain.handle('ssh-open', async (event, { sessionId, config }: { sessionId: string; config: { host: string; port?: number; username?: string; password?: string; privateKey?: string | Buffer; privateKeyPath?: string; passphrase?: string } }) => {
+ipcMain.handle('ssh-open', async (event, { sessionId, config }: { sessionId: string; config: { host: string; port?: number; username?: string; password?: string; privateKey?: string | Buffer; privateKeyPath?: string; passphrase?: string; cols?: number; rows?: number } }) => {
+  const alive = sessions.get(sessionId);
+  if (alive?.conn && alive.stream) {
+    return 'session-open';
+  }
+
   const conn = new Client();
-  sessions.set(sessionId, { conn });
+  const cols = Math.max(1, Math.min(4096, config.cols ?? 80));
+  const rows = Math.max(1, Math.min(4096, config.rows ?? 24));
+  sessions.set(sessionId, { conn, stream: null });
   return new Promise((resolve, reject) => {
     conn
       .on('ready', () => {
-        conn.shell({ term: 'xterm-256color' }, (err: unknown, stream: SshStream) => {
+        conn.shell({ term: 'xterm-256color', cols, rows }, (err: unknown, stream: SshStream) => {
           if (err) return reject(err);
+          sessions.set(sessionId, { conn, stream });
           const inputChannel = `ssh-input:${sessionId}`;
           const dataChannel = `ssh-data:${sessionId}`;
           const onInput = (_: unknown, input: string) => {
@@ -123,6 +157,8 @@ ipcMain.handle('ssh-open', async (event, { sessionId, config }: { sessionId: str
           });
           stream.on('close', () => {
             ipcMain.removeListener(inputChannel, onInput);
+            const cur = sessions.get(sessionId);
+            if (cur) sessions.set(sessionId, { conn: cur.conn, stream: null });
             try {
               conn.end();
             } catch (e) {

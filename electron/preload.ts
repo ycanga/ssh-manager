@@ -6,6 +6,8 @@ type SshConfig = {
   username?: string;
   password?: string;
   privateKey?: string | Buffer;
+  cols?: number;
+  rows?: number;
 };
 
 type Connection = {
@@ -31,6 +33,7 @@ type ElectronAPI = {
   sendSessionInput: (sessionId: string, data: string) => void;
   onSessionData: (sessionId: string, callback: (data: string) => void) => () => void;
   disconnectSession: (sessionId: string) => Promise<void>;
+  resizeSession: (sessionId: string, cols: number, rows: number, heightPx?: number, widthPx?: number) => void;
   exportConnections: () => Promise<boolean>;
   importConnections: () => Promise<boolean>;
 };
@@ -59,6 +62,8 @@ const api: ElectronAPI = {
     return () => ipcRenderer.removeListener(channel, listener);
   },
   disconnectSession: (sessionId) => ipcRenderer.invoke('ssh-disconnect', sessionId),
+  resizeSession: (sessionId, cols, rows, heightPx, widthPx) =>
+    ipcRenderer.send('ssh-session-resize', { sessionId, cols, rows, heightPx, widthPx }),
   exportConnections: () => ipcRenderer.invoke('export-connections'),
   importConnections: () => ipcRenderer.invoke('import-connections'),
 };

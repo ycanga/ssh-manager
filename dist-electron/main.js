@@ -1,181 +1,161 @@
-import { app, ipcMain, dialog, BrowserWindow } from "electron";
-import path from "path";
-import { fileURLToPath } from "url";
-import { Client } from "ssh2";
-import keytar from "keytar";
-import fs from "fs";
-const currentDir = path.dirname(fileURLToPath(import.meta.url));
-const storePath = path.join(app.getPath("userData"), "connections.json");
-let win = null;
-const sessions = /* @__PURE__ */ new Map();
-async function createWindow() {
-  win = new BrowserWindow({
+import { app as S, ipcMain as a, dialog as N, BrowserWindow as _, shell as E } from "electron";
+import v from "path";
+import { fileURLToPath as W } from "url";
+import { Client as x } from "ssh2";
+import J from "keytar";
+import s from "fs";
+const O = v.dirname(W(import.meta.url)), i = v.join(S.getPath("userData"), "connections.json");
+let m = null;
+const h = /* @__PURE__ */ new Map();
+a.on(
+  "ssh-session-resize",
+  (n, e) => {
+    const { sessionId: t, cols: r, rows: o, heightPx: l = 0, widthPx: d = 0 } = e ?? {};
+    if (!t || r < 1 || o < 1) return;
+    const p = h.get(t), c = p == null ? void 0 : p.stream;
+    if (c != null && c.setWindow)
+      try {
+        c.setWindow(o, r, l, d);
+      } catch {
+      }
+  }
+);
+async function j() {
+  m = new _({
     width: 1200,
     height: 800,
     webPreferences: {
       // Vite outputs preload as preload.mjs next to main.js
-      preload: path.join(currentDir, "preload.mjs")
+      preload: v.join(O, "preload.mjs")
     }
-  });
-  if (process.env.NODE_ENV === "development") {
-    await win.loadURL("http://localhost:5173");
-  } else {
-    await win.loadFile(path.join(currentDir, "../dist/index.html"));
-  }
+  }), process.env.NODE_ENV === "development" ? await m.loadURL("http://localhost:5173") : await m.loadFile(v.join(O, "../dist/index.html")), m.webContents.setWindowOpenHandler(({ url: n }) => ((n.startsWith("https:") || n.startsWith("http:")) && E.openExternal(n), { action: "deny" }));
 }
-app.whenReady().then(createWindow);
-app.on("window-all-closed", () => app.quit());
-ipcMain.handle("ssh-connect", async (_event, config) => {
-  const conn = new Client();
-  return new Promise((resolve, reject) => {
-    conn.on("ready", () => {
-      resolve("connected");
-    }).on("error", (err) => {
-      reject(err.message ?? String(err));
+S.whenReady().then(j);
+S.on("window-all-closed", () => S.quit());
+a.handle("ssh-connect", async (n, e) => {
+  const t = new x();
+  return new Promise((r, o) => {
+    t.on("ready", () => {
+      r("connected");
+    }).on("error", (l) => {
+      o(l.message ?? String(l));
     }).connect({
-      host: config.host,
-      port: config.port,
-      username: config.username,
-      password: config.password,
-      privateKey: config.privateKey || (config.privateKeyPath ? fs.readFileSync(config.privateKeyPath) : void 0),
-      passphrase: config.passphrase,
+      host: e.host,
+      port: e.port,
+      username: e.username,
+      password: e.password,
+      privateKey: e.privateKey || (e.privateKeyPath ? s.readFileSync(e.privateKeyPath) : void 0),
+      passphrase: e.passphrase,
       readyTimeout: 1e4
     });
   });
 });
-ipcMain.handle("ssh-shell", async (_event, config) => {
-  const conn = new Client();
-  return new Promise((resolve, reject) => {
-    conn.on("ready", () => {
-      conn.shell({ term: "xterm-256color" }, (err, stream) => {
-        if (err) return reject(err);
-        stream.on("data", (data) => {
-          _event.sender.send("ssh-data", (data == null ? void 0 : data.toString()) ?? "");
-        });
-        ipcMain.removeAllListeners("ssh-input");
-        const onInput = (_, input) => {
-          stream.write(input);
+a.handle("ssh-shell", async (n, e) => {
+  const t = new x();
+  return new Promise((r, o) => {
+    t.on("ready", () => {
+      t.shell({ term: "xterm-256color" }, (l, d) => {
+        if (l) return o(l);
+        d.on("data", (c) => {
+          n.sender.send("ssh-data", (c == null ? void 0 : c.toString()) ?? "");
+        }), a.removeAllListeners("ssh-input");
+        const p = (c, u) => {
+          d.write(u);
         };
-        ipcMain.on("ssh-input", onInput);
-        stream.on("close", () => {
-          ipcMain.removeListener("ssh-input", onInput);
-        });
-        resolve("shell-open");
+        a.on("ssh-input", p), d.on("close", () => {
+          a.removeListener("ssh-input", p);
+        }), r("shell-open");
       });
-    }).on("error", (err) => reject(err)).connect({
-      host: config.host,
-      port: config.port,
-      username: config.username,
-      password: config.password,
-      privateKey: config.privateKey || (config.privateKeyPath ? fs.readFileSync(config.privateKeyPath) : void 0),
-      passphrase: config.passphrase,
+    }).on("error", (l) => o(l)).connect({
+      host: e.host,
+      port: e.port,
+      username: e.username,
+      password: e.password,
+      privateKey: e.privateKey || (e.privateKeyPath ? s.readFileSync(e.privateKeyPath) : void 0),
+      passphrase: e.passphrase,
       readyTimeout: 1e4
     });
   });
 });
-ipcMain.handle("ssh-open", async (event, { sessionId, config }) => {
-  const conn = new Client();
-  sessions.set(sessionId, { conn });
-  return new Promise((resolve, reject) => {
-    conn.on("ready", () => {
-      conn.shell({ term: "xterm-256color" }, (err, stream) => {
-        if (err) return reject(err);
-        const inputChannel = `ssh-input:${sessionId}`;
-        const dataChannel = `ssh-data:${sessionId}`;
-        const onInput = (_, input) => {
+a.handle("ssh-open", async (n, { sessionId: e, config: t }) => {
+  const r = h.get(e);
+  if (r != null && r.conn && r.stream)
+    return "session-open";
+  const o = new x(), l = Math.max(1, Math.min(4096, t.cols ?? 80)), d = Math.max(1, Math.min(4096, t.rows ?? 24));
+  return h.set(e, { conn: o, stream: null }), new Promise((p, c) => {
+    o.on("ready", () => {
+      o.shell({ term: "xterm-256color", cols: l, rows: d }, (u, w) => {
+        if (u) return c(u);
+        h.set(e, { conn: o, stream: w });
+        const f = `ssh-input:${e}`, K = `ssh-data:${e}`, P = (y, F) => {
           try {
-            stream.write(input);
-          } catch (e) {
+            w.write(F);
+          } catch {
           }
         };
-        ipcMain.removeAllListeners(inputChannel);
-        ipcMain.on(inputChannel, onInput);
-        stream.on("data", (data) => {
-          event.sender.send(dataChannel, (data == null ? void 0 : data.toString()) ?? "");
-        });
-        stream.on("close", () => {
-          ipcMain.removeListener(inputChannel, onInput);
+        a.removeAllListeners(f), a.on(f, P), w.on("data", (y) => {
+          n.sender.send(K, (y == null ? void 0 : y.toString()) ?? "");
+        }), w.on("close", () => {
+          a.removeListener(f, P);
+          const y = h.get(e);
+          y && h.set(e, { conn: y.conn, stream: null });
           try {
-            conn.end();
-          } catch (e) {
+            o.end();
+          } catch {
           }
-        });
-        resolve("session-open");
+        }), p("session-open");
       });
-    }).on("error", (err) => reject(err)).connect({
-      host: config.host,
-      port: config.port,
-      username: config.username,
-      password: config.password,
-      privateKey: config.privateKey || (config.privateKeyPath ? fs.readFileSync(config.privateKeyPath) : void 0),
-      passphrase: config.passphrase,
+    }).on("error", (u) => c(u)).connect({
+      host: t.host,
+      port: t.port,
+      username: t.username,
+      password: t.password,
+      privateKey: t.privateKey || (t.privateKeyPath ? s.readFileSync(t.privateKeyPath) : void 0),
+      passphrase: t.passphrase,
       readyTimeout: 1e4
     });
   });
 });
-ipcMain.handle("ssh-disconnect", async (_event, sessionId) => {
-  const s = sessions.get(sessionId);
-  if (s == null ? void 0 : s.conn) {
+a.handle("ssh-disconnect", async (n, e) => {
+  const t = h.get(e);
+  if (t != null && t.conn)
     try {
-      s.conn.end();
-    } catch (e) {
+      t.conn.end();
+    } catch {
     }
-  }
-  sessions.delete(sessionId);
+  h.delete(e);
 });
-ipcMain.handle("save-secret", async (_e, { id, password }) => {
-  await keytar.setPassword("ElectronSSH", id, password);
-  return true;
+a.handle("save-secret", async (n, { id: e, password: t }) => (await J.setPassword("ElectronSSH", e, t), !0));
+a.handle("get-secret", async (n, e) => J.getPassword("ElectronSSH", e));
+a.handle("get-connections", () => s.existsSync(i) ? JSON.parse(s.readFileSync(i, "utf8")) : []);
+a.handle("save-connection", (n, e) => {
+  const t = s.existsSync(i) ? JSON.parse(s.readFileSync(i, "utf8")) : [];
+  t.push(e), s.writeFileSync(i, JSON.stringify(t, null, 2));
 });
-ipcMain.handle("get-secret", async (_e, id) => {
-  return keytar.getPassword("ElectronSSH", id);
+a.handle("update-connection", (n, e) => {
+  const t = s.existsSync(i) ? JSON.parse(s.readFileSync(i, "utf8")) : [], r = t.findIndex((o) => o.id === e.id);
+  r >= 0 && (t[r] = e), s.writeFileSync(i, JSON.stringify(t, null, 2));
 });
-ipcMain.handle("get-connections", () => {
-  if (!fs.existsSync(storePath)) return [];
-  return JSON.parse(fs.readFileSync(storePath, "utf8"));
+a.handle("delete-connection", (n, e) => {
+  const r = (s.existsSync(i) ? JSON.parse(s.readFileSync(i, "utf8")) : []).filter((o) => o.id !== e);
+  s.writeFileSync(i, JSON.stringify(r, null, 2));
 });
-ipcMain.handle("save-connection", (_e, conn) => {
-  const all = fs.existsSync(storePath) ? JSON.parse(fs.readFileSync(storePath, "utf8")) : [];
-  all.push(conn);
-  fs.writeFileSync(storePath, JSON.stringify(all, null, 2));
-});
-ipcMain.handle("update-connection", (_e, conn) => {
-  const all = fs.existsSync(storePath) ? JSON.parse(fs.readFileSync(storePath, "utf8")) : [];
-  const idx = all.findIndex((c) => c.id === conn.id);
-  if (idx >= 0) {
-    all[idx] = conn;
-  }
-  fs.writeFileSync(storePath, JSON.stringify(all, null, 2));
-});
-ipcMain.handle("delete-connection", (_e, id) => {
-  const all = fs.existsSync(storePath) ? JSON.parse(fs.readFileSync(storePath, "utf8")) : [];
-  const filtered = all.filter((c) => c.id !== id);
-  fs.writeFileSync(storePath, JSON.stringify(filtered, null, 2));
-});
-ipcMain.handle("export-connections", async () => {
-  if (!fs.existsSync(storePath)) return false;
-  const data = fs.readFileSync(storePath, "utf8");
-  const { filePath } = await dialog.showSaveDialog(win, {
+a.handle("export-connections", async () => {
+  if (!s.existsSync(i)) return !1;
+  const n = s.readFileSync(i, "utf8"), { filePath: e } = await N.showSaveDialog(m, {
     title: "Bağlantıları Export Et",
     defaultPath: "connections.json",
     filters: [{ name: "JSON", extensions: ["json"] }]
   });
-  if (filePath) {
-    fs.writeFileSync(filePath, data);
-    return true;
-  }
-  return false;
+  return e ? (s.writeFileSync(e, n), !0) : !1;
 });
-ipcMain.handle("import-connections", async () => {
-  const { filePaths } = await dialog.showOpenDialog(win, {
+a.handle("import-connections", async () => {
+  const { filePaths: n } = await N.showOpenDialog(m, {
     title: "Bağlantıları Import Et",
     properties: ["openFile"],
     filters: [{ name: "JSON", extensions: ["json"] }]
   });
-  if (!filePaths || filePaths.length === 0) return false;
-  const imported = JSON.parse(fs.readFileSync(filePaths[0], "utf8"));
-  const existing = fs.existsSync(storePath) ? JSON.parse(fs.readFileSync(storePath, "utf8")) : [];
-  const merged = [...existing, ...imported.filter((c) => !existing.some((e) => e.id === c.id))];
-  fs.writeFileSync(storePath, JSON.stringify(merged, null, 2));
-  return true;
+  if (!n || n.length === 0) return !1;
+  const e = JSON.parse(s.readFileSync(n[0], "utf8")), t = s.existsSync(i) ? JSON.parse(s.readFileSync(i, "utf8")) : [], r = [...t, ...e.filter((o) => !t.some((l) => l.id === o.id))];
+  return s.writeFileSync(i, JSON.stringify(r, null, 2)), !0;
 });

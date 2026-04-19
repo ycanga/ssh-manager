@@ -8,6 +8,15 @@ function App() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [tabs, setTabs] = useState<{ id: string; title: string; conn: Connection }[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [sessionLayout, setSessionLayout] = useState<'tabs' | 'tiled'>(() => {
+    try {
+      const v = localStorage.getItem('ssh-manager-session-layout');
+      if (v === 'tiled' || v === 'tabs') return v;
+    } catch {
+      /* ignore */
+    }
+    return 'tabs';
+  });
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState('');
   const [host, setHost] = useState('');
@@ -30,11 +39,26 @@ function App() {
     }
   }, []);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem('ssh-manager-session-layout', sessionLayout);
+    } catch {
+      /* ignore */
+    }
+  }, [sessionLayout]);
+
+  useEffect(() => {
+    if (tabs.length === 0) {
+      setActiveTabId(null);
+      return;
+    }
+    setActiveTabId((a) => (a && tabs.some((t) => t.id === a) ? a : tabs[0].id));
+  }, [tabs]);
+
   const connectSSH = async (conn: { host: string; port?: number; username: string; password?: string }) => {
     setIsConnecting(true);
     try {
       const sessionId = `${conn.username}@${conn.host}:${conn.port || 22}-${Date.now()}`;
-      await window.electronAPI.openSession(sessionId, conn);
       const tab = { id: sessionId, title: `${conn.username}@${conn.host}`, conn: { id: sessionId, name: sessionId, host: conn.host, port: conn.port, username: conn.username, password: conn.password } };
       setTabs((t) => [...t, tab]);
       setActiveTabId(sessionId);
@@ -59,11 +83,30 @@ function App() {
     setName(''); setHost(''); setPort(22); setUsername(''); setPassword('');
   };
 
+  const closeSessionTab = async (tabId: string) => {
+    await window.electronAPI.disconnectSession(tabId);
+    setTabs((prev) => {
+      const next = prev.filter((x) => x.id !== tabId);
+      setActiveTabId((cur) => {
+        if (cur !== tabId) return cur;
+        const i = prev.findIndex((x) => x.id === tabId);
+        const neighbor = prev[i - 1] ?? prev[i + 1];
+        return neighbor?.id ?? next[0]?.id ?? null;
+      });
+      return next;
+    });
+  };
+
   return (
     <div className="app">
       <div className="sidebar">
         <div className="header" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <h1 style={{ margin: 0, fontSize: '1.8rem' }}>SSH Manager</h1>
+          <p className="sidebar-github">
+            <a href="https://github.com/ycanga" target="_blank" rel="noopener noreferrer">
+              github.com/ycanga
+            </a>
+          </p>
           <div
             className="row"
             style={{
@@ -157,27 +200,85 @@ function App() {
 
       <div className="content">
         {tabs.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <div style={{ display: 'flex', gap: '.5rem', borderBottom: '1px solid var(--border)', padding: '.5rem' }}>
-              {tabs.map(t => (
-                <div key={t.id} className="card" style={{ padding: '.35rem .6rem', display: 'flex', alignItems: 'center', gap: '.5rem', background: activeTabId === t.id ? 'var(--panel)' : '#0b1220' }}>
-                  <button className="btn ghost" onClick={() => setActiveTabId(t.id)}>{t.title}</button>
-                  <button className="btn danger" onClick={async () => {
-                    await window.electronAPI.disconnectSession(t.id);
-                    setTabs((prev) => prev.filter(x => x.id !== t.id));
-                    if (activeTabId === t.id) setActiveTabId(() => {
-                      const rest = tabs.filter(x => x.id !== t.id);
-                      return rest[0]?.id ?? null;
-                    });
-                  }}>×</button>
+          <div className="session-area">
+            <div className="session-toolbar">
+              <div className="session-layout-toggle" role="group" aria-label="Oturum düzeni">
+                <button
+                  type="button"
+                  className={sessionLayout === 'tabs' ? 'is-active' : undefined}
+                  onClick={() => setSessionLayout('tabs')}
+                >
+                  Sekmeler
+                </button>
+                <button
+                  type="button"
+                  className={sessionLayout === 'tiled' ? 'is-active' : undefined}
+                  onClick={() => setSessionLayout('tiled')}
+                >
+                  Yan yana
+                </button>
+              </div>
+            </div>
+
+            {sessionLayout === 'tabs' ? (
+              <div className="tab-stack">
+                <div className="tab-bar" role="tablist">
+                  {tabs.map((t) => (
+                    <div
+                      key={t.id}
+                      className={`tab-chip${activeTabId === t.id ? ' tab-chip--active' : ''}`}
+                      role="presentation"
+                    >
+                      <button type="button" className="tab-chip-label" role="tab" aria-selected={activeTabId === t.id} onClick={() => setActiveTabId(t.id)}>
+                        {t.title}
+                      </button>
+                      <button
+                        type="button"
+                        className="tab-chip-close btn danger"
+                        aria-label="Sekmeyi kapat"
+                        onClick={() => void closeSessionTab(t.id)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div style={{ flex: 1 }}>
-              {tabs.filter(t => t.id === activeTabId).map(t => (
-                <TerminalView key={t.id} connection={t.conn} />
-              ))}
-            </div>
+                <div className="tab-panes">
+                  {tabs.map((t) => (
+                    <div
+                      key={t.id}
+                      className="tab-pane"
+                      role="tabpanel"
+                      style={{ display: activeTabId === t.id ? 'flex' : 'none' }}
+                    >
+                      <TerminalView connection={t.conn} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="session-strip session-strip--tiled" role="list">
+                {tabs.map((t) => (
+                  <section key={t.id} className="session-pane" role="listitem" aria-label={t.title}>
+                    <header className="session-pane-header">
+                      <span className="session-pane-title" title={t.title}>
+                        {t.title}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn danger"
+                        onClick={() => void closeSessionTab(t.id)}
+                      >
+                        ×
+                      </button>
+                    </header>
+                    <div className="session-pane-terminal">
+                      <TerminalView connection={t.conn} />
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8' }}>

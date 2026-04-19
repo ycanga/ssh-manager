@@ -1,0 +1,61 @@
+# Kurulum paketleri: release/ klasörüne üretilir
+# macOS:   npm run dist:mac   → .dmg + .zip
+# Windows: npm run dist:win   → NSIS kurulum + portable .exe (Windows ortamında veya CI)
+# Linux:   npm run dist:linux → AppImage + .deb
+#
+# İmzasız macOS .dmg ilk açılışta Gatekeeper uyarısı verebilir (normal).
+# İsteğe bağlı: build/icon.icns (mac), build/icon.ico (win), build/ altında linux ikonları
+
+appId: com.ycanga.ssh-manager
+productName: SSH Manager
+copyright: Copyright © 2026 ycanga
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+
+asar: true
+asarUnpack:
+  - "**/node_modules/keytar/**/*"
+
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+    - zip
+  gatekeeperAssess: false
+  hardenedRuntime: false
+  identity: null
+
+dmg:
+  sign: false
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  deleteAppDataOnUninstall: false
+
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Development
+  maintainer: ycanga <ycanga@users.noreply.github.com>
+  synopsis: SSH bağlantı yöneticisi
+  description: SSH oturumları ve terminal arayüzü.
